@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <title>LUMEN — Interface de Habilidades</title>
+    <script src="vendor/gsap.min.js"></script>
+    <style>
+      :root {
+        --bg: #040a12;
+        --line: rgba(160, 215, 255, 0.42);
+        --line-soft: rgba(160, 215, 255, 0.16);
+        --text: #e8f5ff;
+        --text-2: rgba(205, 232, 255, 0.74);
+        --accent: #9ad8ff;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; background: var(--bg); }
+      body { font-family: "Inter", sans-serif; color: var(--text); }
+
+      #root { position: relative; width: 1080px; height: 1920px; overflow: hidden; }
+      #scene { position: absolute; inset: 0; width: 1080px; height: 1920px; }
+
+      /* Full-bleed background on a child, never on the root */
+      #bg {
+        position: absolute; inset: 0;
+        background:
+          radial-gradient(ellipse 70% 45% at 50% 50%, rgba(40, 90, 150, 0.22) 0%, rgba(4, 10, 18, 0) 70%),
+          var(--bg);
+      }
+      #grid {
+        position: absolute; inset: 0;
+        background-image:
+          linear-gradient(rgba(150, 205, 255, 0.035) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(150, 205, 255, 0.035) 1px, transparent 1px);
+        background-size: 60px 60px;
+        background-position: 0 0;
+        opacity: 0;
+      }
+
+      .particle {
+        position: absolute; display: block; border-radius: 50%;
+        background: rgba(185, 225, 255, 0.85);
+        opacity: 0;
+      }
+      .frag {
+        position: absolute; display: block; height: 2px;
+        background: rgba(175, 222, 255, 0.9);
+        opacity: 0;
+      }
+
+      /* Holographic panel stack */
+      .layer {
+        position: absolute; left: 100px; top: 400px; width: 880px; height: 1120px;
+        border: 1px solid var(--line-soft);
+        opacity: 0;
+      }
+      #layer-back {
+        background: linear-gradient(180deg, rgba(110, 180, 255, 0.035), rgba(110, 180, 255, 0.015));
+      }
+      #layer-mid {
+        background: linear-gradient(180deg, rgba(120, 190, 255, 0.05), rgba(120, 190, 255, 0.02));
+      }
+      #panel {
+        position: absolute; left: 100px; top: 400px; width: 880px; height: 1120px;
+        background: linear-gradient(180deg, rgba(130, 200, 255, 0.075) 0%, rgba(130, 200, 255, 0.03) 100%);
+        box-shadow: 0 0 40px rgba(90, 170, 255, 0.06);
+        opacity: 0;
+      }
+      .edge { position: absolute; display: block; background: var(--line); }
+      #edge-t { left: 0; top: 0; width: 880px; height: 1px; transform-origin: 50% 50%; }
+      #edge-b { left: 0; bottom: 0; width: 880px; height: 1px; transform-origin: 50% 50%; }
+      #edge-l { left: 0; top: 0; width: 1px; height: 1120px; transform-origin: 50% 50%; }
+      #edge-r { right: 0; top: 0; width: 1px; height: 1120px; transform-origin: 50% 50%; }
+
+      .corner { position: absolute; display: block; width: 34px; height: 34px; opacity: 0; }
+      .corner::before, .corner::after { content: ""; position: absolute; background: var(--accent); }
+      .corner::before { width: 34px; height: 2px; }
+      .corner::after { width: 2px; height: 34px; }
+      #c-tl { left: 82px; top: 382px; }
+      #c-tr { left: 964px; top: 382px; transform: scaleX(-1); }
+      #c-bl { left: 82px; top: 1504px; transform: scaleY(-1); }
+      #c-br { left: 964px; top: 1504px; transform: scale(-1, -1); }
+
+      /* Status ring (functional: progress → completion) */
+      #ring-wrap {
+        position: absolute; left: 440px; top: 520px; width: 200px; height: 200px;
+        opacity: 0;
+      }
+      #ring-wrap svg { position: absolute; inset: 0; width: 200px; height: 200px; overflow: visible; }
+      #tick-l, #tick-r {
+        position: absolute; top: 619px; width: 180px; height: 1px; display: block;
+        background: var(--line-soft); opacity: 0;
+      }
+      #tick-l { left: 220px; transform-origin: 100% 50%; }
+      #tick-r { left: 680px; transform-origin: 0% 50%; }
+
+      /* Text blocks — all centred in the panel's content zone */
+      .block {
+        position: absolute; left: 140px; width: 800px;
+        display: flex; flex-direction: column; align-items: center; text-align: center;
+      }
+      .mono {
+        font-family: "JetBrains Mono", monospace; font-weight: 500;
+        letter-spacing: 0.06em; white-space: nowrap;
+      }
+      .status { font-size: 40px; color: var(--accent); line-height: 1.2; }
+      .status + .status { margin-top: 34px; }
+      .status .ch { opacity: 0; }
+
+      #b-status { top: 960px; }
+      #b-skill { top: 880px; }
+      #b-report { top: 950px; }
+
+      #skill-title {
+        font-weight: 600; font-size: 54px; line-height: 1.25; letter-spacing: 0.01em;
+        color: var(--text); margin: 0;
+      }
+      #skill-title .ln { display: block; opacity: 0; white-space: nowrap; }
+      #divider {
+        display: block; width: 520px; height: 1px; margin: 46px 0 42px;
+        background: linear-gradient(90deg, rgba(160,215,255,0), rgba(160,215,255,0.6), rgba(160,215,255,0));
+      }
+      #skill-desc {
+        font-weight: 300; font-size: 36px; line-height: 1.5; color: var(--text-2);
+        max-width: 700px; margin: 0; opacity: 0;
+      }
+
+      #report-label { font-size: 40px; color: var(--accent); }
+      #report-label .ch { opacity: 0; }
+      #report-msg {
+        font-weight: 400; font-size: 50px; line-height: 1.35; color: var(--text);
+        max-width: 700px; margin: 52px 0 0; opacity: 0;
+      }
+
+      #sweep {
+        position: absolute; left: 101px; top: 400px; width: 878px; height: 160px;
+        background: linear-gradient(180deg, rgba(160,215,255,0) 0%, rgba(160,215,255,0.05) 50%, rgba(160,215,255,0) 100%);
+        opacity: 0;
+      }
+
+      #fade { position: absolute; inset: 0; background: #000; opacity: 0; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-width="1080" data-height="1920" data-duration="10">
+      <section id="scene" class="clip" data-start="0" data-duration="10" data-track-index="1">
+        <div id="bg"></div>
+        <div id="grid"></div>
+        <div id="particles"></div>
+
+        <div id="layer-back" class="layer"></div>
+        <div id="layer-mid" class="layer"></div>
+        <div id="panel">
+          <span id="edge-t" class="edge"></span>
+          <span id="edge-b" class="edge"></span>
+          <span id="edge-l" class="edge"></span>
+          <span id="edge-r" class="edge"></span>
+        </div>
+        <div id="sweep"></div>
+        <span id="c-tl" class="corner"></span>
+        <span id="c-tr" class="corner"></span>
+        <span id="c-bl" class="corner"></span>
+        <span id="c-br" class="corner"></span>
+
+        <span id="tick-l"></span>
+        <span id="tick-r"></span>
+        <div id="ring-wrap">
+          <svg viewBox="0 0 200 200">
+            <circle cx="100" cy="100" r="78" fill="none" stroke="rgba(160,215,255,0.16)" stroke-width="1.5" />
+            <circle id="ring-progress" cx="100" cy="100" r="78" fill="none" stroke="#9ad8ff" stroke-width="2"
+              stroke-linecap="round" stroke-dasharray="490.09" stroke-dashoffset="490.09"
+              transform="rotate(-90 100 100)" />
+            <circle id="ring-inner" cx="100" cy="100" r="54" fill="none" stroke="rgba(160,215,255,0.28)" stroke-width="1"
+              stroke-dasharray="4 10" />
+            <path id="check" d="M80 101 L95 116 L122 87" fill="none" stroke="#e8f5ff" stroke-width="3"
+              stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="64" stroke-dashoffset="64" />
+            <path id="plus" d="M100 86 L100 114 M86 100 L114 100" fill="none" stroke="#e8f5ff" stroke-width="3"
+              stroke-linecap="round" opacity="0" />
+            <path id="node" d="M100 82 L118 100 L100 118 L82 100 Z" fill="none" stroke="#e8f5ff" stroke-width="2.5"
+              stroke-linejoin="round" opacity="0" />
+          </svg>
+        </div>
+
+        <div id="b-status" class="block">
+          <div id="s1" class="mono status" data-text="[ ANÁLISE CONCLUÍDA ]"></div>
+          <div id="s2" class="mono status" data-text="[ NOVA HABILIDADE ADQUIRIDA ]"></div>
+        </div>
+
+        <div id="b-skill" class="block">
+          <h1 id="skill-title"><span class="ln" id="t1">[ HABILIDADE:</span><span class="ln" id="t2">PERCEPÇÃO ACELERADA ]</span></h1>
+          <span id="divider"></span>
+          <p id="skill-desc">Permite processar informações visuais e identificar padrões com maior velocidade, facilitando a tomada de decisões.</p>
+        </div>
+
+        <div id="b-report" class="block">
+          <div id="report-label" class="mono" data-text="[ RELATÓRIO ]"></div>
+          <p id="report-msg">Uma nova habilidade foi integrada ao seu sistema.</p>
+        </div>
+
+        <div id="fade"></div>
+      </section>
+
+      <audio id="sfx" src="audio/sfx.wav" data-start="0" data-duration="10" data-track-index="10" data-volume="1"></audio>
+    </div>
+
+    <script>
+      (function () {
+        // Seeded PRNG — deterministic frames
+        function mulberry32(a) {
+          return function () {
+            a |= 0; a = (a + 0x6d2b79f5) | 0;
+            let t = Math.imul(a ^ (a >>> 15), 1 | a);
+            t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+          };
+        }
+        const rnd = mulberry32(20261103);
+        const r = (a, b) => a + (b - a) * rnd();
+
+        // Split bracketed status lines into per-character spans (text kept verbatim)
+        document.querySelectorAll("[data-text]").forEach((el) => {
+          const txt = el.getAttribute("data-text");
+          el.textContent = "";
+          for (const c of txt) {
+            const s = document.createElement("span");
+            s.className = "ch";
+            s.textContent = c === " " ? " " : c;
+            el.appendChild(s);
+          }
+        });
+
+        // Particles: small, slow
+        const pWrap = document.getElementById("particles");
+        const particles = [];
+        for (let i = 0; i < 46; i++) {
+          const p = document.createElement("span");
+          p.className = "particle";
+          const size = r(2, 4.2);
+          p.style.width = size + "px";
+          p.style.height = size + "px";
+          p.style.left = r(40, 1040) + "px";
+          p.style.top = r(160, 1780) + "px";
+          pWrap.appendChild(p);
+          particles.push(p);
+        }
+
+        // Fragments: scattered, they settle onto the panel's perimeter
+        const PX = 100, PY = 400, PW = 880, PH = 1120;
+        const frags = [];
+        const N = 32;
+        for (let i = 0; i < N; i++) {
+          const f = document.createElement("span");
+          f.className = "frag";
+          const len = r(22, 70);
+          f.style.width = len + "px";
+          // target on perimeter
+          const side = i % 4;
+          const u = (Math.floor(i / 4) + 0.5) / (N / 4);
+          let tx, ty, rot;
+          if (side === 0) { tx = PX + u * PW - len / 2; ty = PY; rot = 0; }
+          else if (side === 1) { tx = PX + PW - len / 2; ty = PY + u * PH; rot = 90; }
+          else if (side === 2) { tx = PX + (1 - u) * PW - len / 2; ty = PY + PH; rot = 0; }
+          else { tx = PX - len / 2; ty = PY + (1 - u) * PH; rot = 90; }
+          f.style.left = tx + "px";
+          f.style.top = ty + "px";
+          f.style.transform = "rotate(" + rot + "deg)";
+          document.getElementById("scene").insertBefore(f, document.getElementById("layer-back"));
+          const ang = r(0, Math.PI * 2);
+          const dist = r(220, 520);
+          frags.push({ el: f, dx: Math.cos(ang) * dist, dy: Math.sin(ang) * dist, rot0: rot + r(-120, 120), rot });
+        }
+
+        window.__timelines = window.__timelines || {};
+        const tl = gsap.timeline({ paused: true });
+        const soft = "power2.out", calm = "sine.inOut";
+
+        // ── 0–2s · fragments organise, interface emerges ─────────────
+        tl.to("#grid", { opacity: 1, duration: 2.0, ease: calm }, 0);
+
+        particles.forEach((p, i) => {
+          const start = r(0, 0.9);
+          tl.to(p, { opacity: r(0.25, 0.6), duration: 1.2, ease: calm }, start);
+          tl.to(p, { y: r(-160, -60), x: r(-24, 24), duration: 10 - start, ease: "none" }, start);
+        });
+
+        frags.forEach((f, i) => {
+          const t0 = 0.05 + i * 0.022;
+          tl.fromTo(f.el,
+            { x: f.dx, y: f.dy, rotation: f.rot0, opacity: 0 },
+            { x: 0, y: 0, rotation: f.rot, opacity: 0.95, duration: 1.15, ease: "power3.out" }, t0);
+          tl.to(f.el, { opacity: 0, duration: 0.5, ease: soft }, 1.45 + i * 0.008);
+        });
+
+        tl.fromTo("#edge-t, #edge-b", { scaleX: 0 }, { scaleX: 1, duration: 0.7, ease: "power2.inOut" }, 1.05);
+        tl.fromTo("#edge-l, #edge-r", { scaleY: 0 }, { scaleY: 1, duration: 0.7, ease: "power2.inOut" }, 1.05);
+        tl.to("#panel", { opacity: 1, duration: 0.6, ease: soft }, 1.0);
+        tl.fromTo("#layer-mid", { opacity: 0, x: 0, y: 0 }, { opacity: 1, x: 14, y: 14, duration: 0.9, ease: soft }, 1.25);
+        tl.fromTo("#layer-back", { opacity: 0, x: 0, y: 0 }, { opacity: 1, x: 28, y: 28, duration: 1.0, ease: soft }, 1.4);
+        tl.to(".corner", { opacity: 1, duration: 0.5, ease: soft, stagger: 0.06 }, 1.5);
+
+        tl.fromTo("#ring-wrap", { opacity: 0, scale: 0.92 }, { opacity: 1, scale: 1, duration: 0.7, ease: soft }, 1.3);
+        tl.fromTo("#tick-l, #tick-r", { scaleX: 0, opacity: 0 }, { scaleX: 1, opacity: 1, duration: 0.7, ease: soft }, 1.5);
+        tl.to("#ring-progress", { attr: { "stroke-dashoffset": 0 }, duration: 0.85, ease: "power1.inOut" }, 1.3);
+        tl.to("#ring-inner", { rotation: 90, svgOrigin: "100 100", duration: 8.6, ease: "none" }, 1.4);
+
+        // a single, discreet scan pass across the panel
+        tl.fromTo("#sweep", { y: 0, opacity: 0 }, { y: 960, opacity: 1, duration: 1.6, ease: calm }, 1.6);
+        tl.to("#sweep", { opacity: 0, duration: 0.3 }, 3.2);
+
+        // gentle holographic parallax for the rest of the piece
+        tl.to("#layer-back", { x: 22, y: 34, duration: 7.4, ease: calm }, 2.4);
+        tl.to("#layer-mid", { x: 10, y: 18, duration: 7.6, ease: calm }, 2.2);
+
+        // ── 2–4s · status lines ───────────────────────────────────────
+        tl.to("#check", { attr: { "stroke-dashoffset": 0 }, duration: 0.45, ease: soft }, 2.05);
+        tl.to("#s1 .ch", { opacity: 1, duration: 0.05, stagger: 0.022, ease: "none" }, 2.1);
+        tl.from("#s1", { y: 10, duration: 0.5, ease: soft }, 2.1);
+        tl.to("#s2 .ch", { opacity: 1, duration: 0.05, stagger: 0.022, ease: "none" }, 2.9);
+        tl.from("#s2", { y: 10, duration: 0.5, ease: soft }, 2.9);
+
+        tl.to("#b-status", { opacity: 0, y: -14, duration: 0.45, ease: "power2.in" }, 3.75);
+        tl.to("#check", { opacity: 0, duration: 0.3 }, 3.8);
+
+        // ── 4–7s · skill in focus ─────────────────────────────────────
+        tl.fromTo("#node", { opacity: 0, scale: 0.7, svgOrigin: "100 100" },
+          { opacity: 1, scale: 1, svgOrigin: "100 100", duration: 0.5, ease: soft }, 4.1);
+        tl.fromTo("#t1", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.6, ease: soft }, 4.2);
+        tl.fromTo("#t2", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.6, ease: soft }, 4.34);
+        tl.fromTo("#divider", { scaleX: 0 }, { scaleX: 1, duration: 0.7, ease: "power2.inOut" }, 4.7);
+        tl.fromTo("#skill-desc", { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.8, ease: soft }, 4.9);
+
+        tl.to("#b-skill", { opacity: 0, y: -14, duration: 0.5, ease: "power2.in" }, 6.75);
+        tl.to("#node", { opacity: 0, duration: 0.35 }, 6.8);
+
+        // ── 7–10s · report ────────────────────────────────────────────
+        tl.fromTo("#ring-progress", { opacity: 1 }, { opacity: 0.55, duration: 0.6, ease: calm }, 7.0);
+        tl.to("#report-label .ch", { opacity: 1, duration: 0.05, stagger: 0.03, ease: "none" }, 7.25);
+        tl.from("#report-label", { y: 10, duration: 0.5, ease: soft }, 7.25);
+        tl.fromTo("#report-msg", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.8, ease: soft }, 7.75);
+
+        // soft close
+        tl.to("#panel, .layer, .corner, #ring-wrap, #tick-l, #tick-r, #b-report",
+          { opacity: 0, duration: 0.8, ease: calm }, 9.0);
+        tl.to("#fade", { opacity: 1, duration: 0.9, ease: calm }, 9.1);
+
+        window.__timelines["main"] = tl;
+      })();
+    </script>
+  </body>
+</html>
