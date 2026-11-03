@@ -365,3 +365,33 @@ Para produzir vídeo, use o OpenMontage como orquestrador. Ele chama:
 - Blender para cenas 3D de alta qualidade.
 
 As skills de design (impeccable, taste-skill, ui-ux-pro-max, cinetic, motion-prompt e as skills da Remotion) orientam a qualidade visual do que o agente produz. Os servidores MCP (chrome-devtools-mcp e mcp-for-blender) dão ao agente controle direto do navegador e do Blender.
+
+---
+
+## 5. Atualização — ambiente com rede liberada (03/11/2026)
+
+O ambiente foi trocado por um com acesso liberado à internet (ainda sem GPU: 4 CPUs, 15 GB de RAM). As pendências da seção 2 foram retestadas:
+
+| Repositório | Antes | Agora | O que foi feito |
+|---|---|---|---|
+| faster-whisper | Parcial | Funciona | O modelo `small` foi baixado e transcreveu áudio em português |
+| blender | Sem executável | Funciona | Instalado o Blender 5.2.3 LTS oficial; render headless ok; o OpenMontage detecta `blender_world` |
+| mcp-for-blender | 1 teste falhando no fork | Funciona | Testado de ponta a ponta: Blender com monitor virtual (xvfb) e add-on conectado; o agente leu a cena e criou um objeto. Use `uvx mcp-for-blender` (versão do PyPI) |
+| ComfyUI | Sem PyTorch | Funciona (CPU) | PyTorch CPU instalado; autoteste ok; o servidor v0.43 respondeu em `127.0.0.1:8188`. Para gerar imagem e vídeo em tempo útil, é preciso GPU NVIDIA e modelos em `models/` |
+| chatterbox | Sem PyTorch | Funciona (CPU) | PyTorch 2.6 CPU instalado; frase em português gerada (3 s de áudio em cerca de 2 min de CPU) |
+| yt-dlp | Sem rede | Funciona | Download completo do archive.org; legendas do YouTube ok. O vídeo do YouTube dá 403 em servidores de nuvem (bloqueio do próprio YouTube); em computador doméstico funciona. Exige `yt-dlp[default]` e `--js-runtimes node` (ou o Deno instalado) |
+| Remotion | Exigia `--browser-executable` | Funciona | O Chrome headless agora baixa sozinho |
+| OpenMontage | Voz 0/18, análise 7/14 | Voz 1/18, análise 10/14 | Instalados o Piper TTS com a voz `pt_BR-faber-medium`, o faster-whisper, o youtube-transcript-api e o MediaPipe |
+
+**Continuam pendentes. Dependem de você, não do ambiente:**
+- **G.E:** vazio. É preciso enviar conteúdo.
+- **Claude-Code:** só tem o README. É preciso enviar os projetos.
+- **Provedores pagos do OpenMontage** (voz em nuvem, imagem, vídeo e música por IA): exigem chaves de API no `.env`.
+- **Ferramentas `local_gpu`** (ComfyUI no OpenMontage, geração local de vídeo e imagem): funcionam, mas sem placa de vídeo ficam lentas demais para uso real.
+
+**Script de configuração.** O arquivo `scripts/setup-ambiente.sh` refaz tudo isso em qualquer máquina Linux:
+- `bash scripts/setup-ambiente.sh` instala o essencial: dependências Python, Piper pt-BR, configuração do yt-dlp, Remotion e HyperFrames.
+- `FULL=1 bash scripts/setup-ambiente.sh` instala também Blender, xvfb, ComfyUI e chatterbox.
+- Com GPU NVIDIA, defina `TORCH_INDEX=https://download.pytorch.org/whl/cu128` antes de rodar.
+
+Para que cada nova sessão na nuvem já comece pronta, coloque esse comando como "Setup script" nas configurações do ambiente: menu do ambiente no título da sessão, depois Edit.
